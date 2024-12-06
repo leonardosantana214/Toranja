@@ -64,7 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         * {
             font-family: 'Pixeboy-z8XGD';
         }
-
+        body{
+            background-color: #000 !important;
+        }
         .body {
             font-family: Arial, sans-serif;
             background-image: url('https://giffiles.alphacoders.com/212/212449.gif');

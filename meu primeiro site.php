@@ -662,7 +662,7 @@ $username_toshow = $_SESSION['nome'];
 								<i class="fa-solid fa-cart-shopping"></i>
 							</button>
 
-							<div id="carrinho-janela">
+							<div id="carrinho-janela" style="background-color:transparent;">
 								<div id="carrinho-conteudo">
 									<!-- Conteúdo da janela -->
 									<?php
