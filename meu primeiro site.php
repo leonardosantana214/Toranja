@@ -506,7 +506,7 @@ $username_toshow = $_SESSION['nome'];
 
 		<div id="wrapper">
 			<div class="animated-box">
-				<header id="branding">
+				<header id="branding" style="min-height: 84waeepx;">
 					<h1>
 						<?php $imagem = $_SESSION['image']; ?>
 
