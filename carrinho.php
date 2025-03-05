@@ -2,6 +2,8 @@
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+
+
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -12,6 +14,7 @@ $database = 'toranja';
 
 include_once('conexao.php');
 
+
 $mysqli = new mysqli($host, $usuario, $senha, $database);
 if ($mysqli->connect_error) {
     die('Falha ao conectar ao banco de dados: ' . $mysqli->connect_error);
@@ -19,238 +22,135 @@ if ($mysqli->connect_error) {
 
 function getProdutoInfo($mysqli, $produto_id)
 {
-    $query_produto = "SELECT nome, preco, imagem FROM produtos WHERE id = ?";
-    $stmt_produto = $mysqli->prepare($query_produto);
-
-    if (!$stmt_produto) {
-        return false;
-    }
-
-    $stmt_produto->bind_param('i', $produto_id);
-
-    if (!$stmt_produto->execute()) {
-        return false;
-    }
-
-    $result_produto = $stmt_produto->get_result();
-
-    if ($result_produto->num_rows > 0) {
-        return $result_produto->fetch_assoc();
-    }
-
-    return false;
+    $stmt = $mysqli->prepare("SELECT nome, preco, imagem FROM produtos WHERE id = ?");
+    if (!$stmt) return false;
+    $stmt->bind_param('i', $produto_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
 }
 
 function adicionarProdutoAoCarrinho($mysqli, $usuario_id, $produto_id, $quantidade)
 {
     $produto = getProdutoInfo($mysqli, $produto_id);
+    if (!$produto) return 'Produto não encontrado.';
 
-    if (!$produto) {
-        return 'Nenhum produto encontrado com o ID especificado.';
-    }
+    $stmt = $mysqli->prepare("INSERT INTO carrinho (usuario_id, produto_id, quantidade, preco, produto_nome, produto_imagem) VALUES (?, ?, ?, ?, ?, ?)");
+    if (!$stmt) return 'Erro na consulta: ' . $mysqli->error;
 
-    $sql = "INSERT INTO carrinho (usuario_id, produto_id, quantidade, preco, produto_nome, produto_imagem) VALUES (?, ?, ?, ?, ?, ?)";
-    $stmt_carrinho = $mysqli->prepare($sql);
-
-    if (!$stmt_carrinho) {
-        return 'Erro na preparação da consulta de carrinho: ' . $mysqli->error;
-    }
-
-    $stmt_carrinho->bind_param('iiidss', $usuario_id, $produto_id, $quantidade, $produto['preco'], $produto['nome'], $produto['imagem']);
-
-    if ($stmt_carrinho->execute() && $stmt_carrinho->affected_rows > 0) {
-        return 'Produto adicionado ao carrinho com sucesso!';
-    } else {
-        return 'Erro ao adicionar produto ao carrinho: ' . $stmt_carrinho->error;
-    }
+    $stmt->bind_param('iiidss', $usuario_id, $produto_id, $quantidade, $produto['preco'], $produto['nome'], $produto['imagem']);
+    $stmt->execute();
+    return $stmt->affected_rows > 0 ? 'Produto adicionado ao carrinho!' : 'Erro ao adicionar produto.';
 }
 
 function atualizarQuantidadeProduto($mysqli, $carrinho_id, $nova_quantidade)
 {
-    $sql = "UPDATE carrinho SET quantidade = ? WHERE id = ?";
-    $stmt = $mysqli->prepare($sql);
-
-    if (!$stmt) {
-        return 'Erro na preparação da atualização de quantidade: ' . $mysqli->error;
-    }
+    $stmt = $mysqli->prepare("UPDATE carrinho SET quantidade = ? WHERE id = ?");
+    if (!$stmt) return 'Erro na atualização: ' . $mysqli->error;
 
     $stmt->bind_param('ii', $nova_quantidade, $carrinho_id);
-
-    if ($stmt->execute()) {
-        if ($stmt->affected_rows > 0) {
-            return true; // Retorna verdadeiro se a atualização foi bem-sucedida
-        } else {
-            return 'Nenhuma linha afetada. Verifique se o ID do carrinho é válido.';
-        }
-    } else {
-        return 'Erro ao executar a atualização: ' . $stmt->error;
-    }
+    $stmt->execute();
+    return $stmt->affected_rows > 0 ? true : 'Nenhuma linha afetada ou erro ao atualizar.';
 }
 
 function excluirProdutoDoCarrinho($mysqli, $carrinho_id)
 {
-    $sql = "DELETE FROM carrinho WHERE id = ?";
-    $stmt = $mysqli->prepare($sql);
-
-    if (!$stmt) {
-        return false;
-    }
+    $stmt = $mysqli->prepare("DELETE FROM carrinho WHERE id = ?");
+    if (!$stmt) return false;
 
     $stmt->bind_param('i', $carrinho_id);
-
-    if ($stmt->execute()) {
-        return true;
-    } else {
-        return false;
-    }
+    return $stmt->execute();
 }
-// Função para calcular o total sem desconto
+
 function calcularTotalSemDesconto($mysqli, $usuario_id)
 {
-    $sql = "SELECT SUM(preco * quantidade) AS totalSemDesconto FROM carrinho WHERE usuario_id = ?";
-    $stmt = $mysqli->prepare($sql);
+    $stmt = $mysqli->prepare("SELECT SUM(preco * quantidade) AS total FROM carrinho WHERE usuario_id = ?");
+    if (!$stmt) return 0;
 
-    if ($stmt) {
-        $stmt->bind_param('i', $usuario_id);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        if ($result && $row = $result->fetch_assoc()) {
-            return $row['totalSemDesconto'];
-        }
-    }
-
-    return 0;
+    $stmt->bind_param('i', $usuario_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc()['total'] ?? 0;
 }
 
-// Função para calcular o desconto percentual com base na quantidade total
 function calcularDescontoPercentual($quantidadeTotal)
 {
-    if ($quantidadeTotal >= 3 && $quantidadeTotal < 6) {
-        return 5;
-    } elseif ($quantidadeTotal >= 6 && $quantidadeTotal < 9) {
-        return 10;
-    } elseif ($quantidadeTotal >= 9) {
-        return 25;
-    }
-
-    return 0;
+    return $quantidadeTotal >= 9 ? 25 : ($quantidadeTotal >= 6 ? 10 : ($quantidadeTotal >= 3 ? 5 : 0));
 }
 
-// Função para calcular o desconto com base no total sem desconto e no desconto percentual
-function calcularDesconto($totalSemDesconto, $descontoPercentual)
+function calcularDesconto($total, $descontoPercentual)
 {
-    return $totalSemDesconto * ($descontoPercentual / 100);
+    return $total * ($descontoPercentual / 100);
 }
 
-// Função para calcular o total com desconto
-function calcularTotalComDesconto($totalSemDesconto, $desconto)
+function calcularTotalComDesconto($total, $desconto)
 {
-    return $totalSemDesconto - $desconto;
+    return $total - $desconto;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
     if (isset($_POST['adicionar_carrinho'])) {
         if (!isset($_SESSION['usuario_id'])) {
             header("Location: LoginToranjão.php");
             exit();
         }
-
         $produto_id = $_POST['produto_id'] ?? null;
         $quantidade = $_POST['quantidade'] ?? null;
         $usuario_id = $_SESSION['usuario_id'];
-
-        $resultado = adicionarProdutoAoCarrinho($mysqli, $usuario_id, $produto_id, $quantidade);
-        $_SESSION['mensagem_sucesso'] = $resultado;
-
+        $_SESSION['mensagem_sucesso'] = adicionarProdutoAoCarrinho($mysqli, $usuario_id, $produto_id, $quantidade);
         header("Location: Meu Primeiro Site.php");
         exit();
     }
-}
-if (isset($_POST['carrinho_id'])) {
-    $carrinho_id = $_POST['carrinho_id'];
 
-    if (isset($_POST['excluir_produto'])) {
-        $resultado = excluirProdutoDoCarrinho($mysqli, $carrinho_id);
-
-        if ($resultado) {
-            // Se a exclusão for bem-sucedida, redirecione ou exiba uma mensagem, conforme necessário
+    if (isset($_POST['carrinho_id'])) {
+        $carrinho_id = $_POST['carrinho_id'];
+        if (isset($_POST['excluir_produto']) && excluirProdutoDoCarrinho($mysqli, $carrinho_id)) {
             header("Location: Meu Primeiro Site.php");
-            exit();
-        } else {
-            // Se a exclusão falhar, você pode exibir uma mensagem de erro ou fazer outras ações
-            echo 'Erro ao remover o produto do carrinho';
             exit();
         }
     }
 
-}
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['ajax_request']) && $_POST['ajax_request'] === 'true') {
-        // Verificar se é uma requisição para excluir o produto do carrinho
         if (isset($_POST['excluir_produto'])) {
-            $carrinho_id = $_POST['carrinho_id'];
-            $resultado = excluirProdutoDoCarrinho($mysqli, $carrinho_id);
-
-            if ($resultado) {
-                echo 'Produto removido do carrinho com sucesso!';
-            } else {
-                echo 'Erro ao remover o produto do carrinho';
-            }
+            echo excluirProdutoDoCarrinho($mysqli, $_POST['carrinho_id']) ? 'Produto removido!' : 'Erro ao remover';
             exit();
         }
 
-        // Verificar se é uma requisição para atualizar a quantidade do produto no carrinho
         if (isset($_POST['nova_quantidade'])) {
             $carrinho_id = $_POST['carrinho_id'];
             $nova_quantidade = $_POST['nova_quantidade'];
 
-            $resultado = atualizarQuantidadeProduto($mysqli, $carrinho_id, $nova_quantidade);
+            if (atualizarQuantidadeProduto($mysqli, $carrinho_id, $nova_quantidade) === true) {
+                $totalSemDesconto = calcularTotalSemDesconto($mysqli, $_SESSION['usuario_id']);
+                $descontoPercentual = calcularDescontoPercentual($totalSemDesconto);
+                $desconto = calcularDesconto($totalSemDesconto, $descontoPercentual);
+                $totalComDesconto = calcularTotalComDesconto($totalSemDesconto, $desconto);
 
-            if ($resultado === true) {
-                // Se a atualização foi bem-sucedida, buscar os novos totais
-                $novoTotalSemDesconto = calcularTotalSemDesconto($mysqli, $_SESSION['usuario_id']);
-                $descontoPercentual = calcularDescontoPercentual($novoTotalSemDesconto);
-                $novoDesconto = calcularDesconto($novoTotalSemDesconto, $descontoPercentual);
-                $novoTotalComDesconto = calcularTotalComDesconto($novoTotalSemDesconto, $novoDesconto);
-
-                // Retornar os novos totais
-                echo json_encode(
-                    array(
-                        'totalSemDesconto' => $novoTotalSemDesconto,
-                        'desconto' => $novoDesconto,
-                        'descontoPercentual' => $descontoPercentual,
-                        'totalComDesconto' => $novoTotalComDesconto
-                    )
-                );
+                echo json_encode([
+                    'totalSemDesconto' => $totalSemDesconto,
+                    'desconto' => $desconto,
+                    'descontoPercentual' => $descontoPercentual,
+                    'totalComDesconto' => $totalComDesconto
+                ]);
             } else {
-                echo 'Erro ao atualizar a quantidade do produto no carrinho: ' . $resultado;
+                echo 'Erro ao atualizar quantidade';
             }
             exit();
         }
     }
-
 }
 
-
 if (isset($_SESSION['usuario_id'])) {
-    $sql = "SELECT carrinho.*, produtos.nome, produtos.imagem FROM carrinho 
-            JOIN produtos ON carrinho.produto_id = produtos.id 
-            WHERE usuario_id = ?";
-    $stmt = $mysqli->prepare($sql);
-
+    $stmt = $mysqli->prepare("SELECT carrinho.*, produtos.nome, produtos.imagem FROM carrinho JOIN produtos ON carrinho.produto_id = produtos.id WHERE usuario_id = ?");
     if ($stmt) {
         $stmt->bind_param('i', $_SESSION['usuario_id']);
         $stmt->execute();
-
         $result_verificar_carrinho = $stmt->get_result();
     }
 }
 
 $mysqli->close();
 ?>
+
+
 <!DOCTYPE html>
 <html lang="pt-br">
 
@@ -260,6 +160,14 @@ $mysqli->close();
     <style>
         * {
             font-family: 'Pixeboy-z8XGD';
+        }
+
+        .quantidade {
+            background-color: transparent;
+            border: 1px gray solid;
+            width: 25px;
+            margin: 5px;
+
         }
 
         .pp span {
@@ -276,8 +184,8 @@ $mysqli->close();
         }
 
         .carrinho-principal {
-            max-height: 450px;
             overflow-y: auto;
+            max-block-size: 450px;
         }
 
 
@@ -303,10 +211,9 @@ $mysqli->close();
         .carrinho {
             align-items: center;
             display: flex;
-            position: absolute;
-            justify-content: space-around;
+            justify-content: space-evenly;
             flex-direction: column;
-            left: 20px;
+            text-align: center;
         }
 
         @font-face {
@@ -338,9 +245,11 @@ $mysqli->close();
             width: 90%;
             display: flex;
             flex-direction: row;
-            justify-content: center;
+            justify-content: space-evenly;
             transform: translateY(0px);
             transition: 1s;
+            align-items: center;
+
         }
 
         .carrinho-item:hover {
@@ -403,7 +312,7 @@ $mysqli->close();
             cursor: pointer;
         }
 
-        .excluir-produto {
+        .excluir-produto:hover {
             cursor: pointer;
             text-decoration: underline;
             color: red;
@@ -441,177 +350,192 @@ $mysqli->close();
                 transform: translatey(0px);
             }
         }
+
+        .carrinho-all-tools{
+            overflow-y: none;
+        }
     </style>
 
 </head>
 
-<body>
-    <p class="p">CARRINHO</p>
 
+<div class="carrinho-all-tools">
+    <p class="p">CARRINHO</p>
     <div class="carrinho-principal">
+
         <?php
         if (isset($result_verificar_carrinho) && $result_verificar_carrinho && $result_verificar_carrinho->num_rows > 0):
             $totalSemDesconto = 0;
-            $quantidadeTotal = 0; // Adiciona uma variável para armazenar a quantidade total
-        
+            $quantidadeTotal = 0;
             while ($row = $result_verificar_carrinho->fetch_assoc()):
                 $totalSemDesconto += $row['preco'] * $row['quantidade'];
-                $quantidadeTotal += $row['quantidade']; // Incrementa a quantidade total
-                ?>
-                <div class="carrinho-item">
-                    <img src="<?= $row['imagem'] ?>" alt="Imagem do Produto" height="90px" width="90px">
-                    <p class="nome">
-                        <?= $row['nome'] ?>
-                    </p>
-                    <p class="preco" data-preco="<?= $row['preco'] ?>">R$
-                        <?= $row['preco'] ?>
-                    </p>
+                $quantidadeTotal += $row['quantidade'];
+        ?>
 
+                <div class="carrinho-item">
+                    <img src="<?= $row['produto_imagem'] ?>" alt="Imagem do Produto" height="90px" width="90px">
+                    <p class="nome"><?= $row['produto_nome'] ?></p>
+                    <p class="preco" data-preco="<?= $row['preco'] ?>">R$ <?= $row['preco'] ?></p>
                     <div class="quantidade-controls">
-                        <button class="diminuir" data-carrinho-id="<?= $row['id'] ?>">-</button>
-                        <span class="quantidade" contenteditable="true" style="color:black;"
-                            data-carrinho-id="<?= $row['id'] ?>">
-                            <?= $row['quantidade'] ?>
-                        </span>
-                        <button class="aumentar" data-carrinho-id="<?= $row['id'] ?>">+</button>
-                        <form method="post" action="carrinho.php">
-                            <input type="hidden" name="carrinho_id" value="<?= $row['id'] ?>">
-                            <button type="submit" name="excluir_produto">Excluir</button>
-                        </form>
+                        <input type="number" class="quantidade" max="10" data-carrinho-id="<?= $row['id'] ?>" value="<?= $row['quantidade'] ?>" min="1">
+                        <a href="carrinho.php?excluir_produto=<?= $row['id'] ?>" class="excluir-produto">Excluir</a>
                     </div>
                 </div>
 
 
-                <?php
+            <?php
             endwhile;
-
-            $descontoPercentual = 0;
-
-            if ($quantidadeTotal >= 3 && $quantidadeTotal < 6) {
-                $descontoPercentual = 5;
-            } elseif ($quantidadeTotal >= 6 && $quantidadeTotal < 9) {
-                $descontoPercentual = 10;
-            } elseif ($quantidadeTotal >= 9) {
-                $descontoPercentual = 25;
-            }
-
-            $desconto = $totalSemDesconto * ($descontoPercentual / 100);
-            $totalComDesconto = $totalSemDesconto - $desconto;
-            ?>
-        <?php else: ?>
-            <div class="animation">
-                <div class="p">
-                    <img src="https://i.pinimg.com/originals/90/9c/b8/909cb8f105fc533e86901a2f0dcf5d7d.gif" Align="center"
-                        class="Img-cart" alt="fotinha">
-                    <p style="color: orangered;">Vazio</p>
-                </div>
-            </div>
-        <?php endif; ?>
-    </div>
-
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-    <script>
-        $(document).ready(function () {
-            function calcularTotais() {
-                var totalSemDesconto = 0;
-                var quantidadeTotal = 0;
-
-                $('.carrinho-item').each(function () {
-                    var preco = parseFloat($(this).find('.preco').data('preco'));
-                    var quantidade = parseInt($(this).find('.quantidade').text(), 10);
-
-                    totalSemDesconto += preco * quantidade;
-                    quantidadeTotal += quantidade;
-                });
-
-                var descontoPercentual = 0;
-                if (quantidadeTotal >= 3 && quantidadeTotal < 6) {
-                    descontoPercentual = 5;
-                } else if (quantidadeTotal >= 6 && quantidadeTotal < 9) {
-                    descontoPercentual = 10;
-                } else if (quantidadeTotal >= 9) {
-                    descontoPercentual = 25;
-                }
-
-                var desconto = totalSemDesconto * (descontoPercentual / 100);
-                var totalComDesconto = totalSemDesconto - desconto;
-
-                return {
-                    totalSemDesconto: totalSemDesconto,
-                    quantidadeTotal: quantidadeTotal,
-                    descontoPercentual: descontoPercentual,
-                    desconto: desconto,
-                    totalComDesconto: totalComDesconto
-                };
-            }
-
-            function atualizarTotaisNaInterface(totais) {
-                $('.total-sem-desconto').html(totais.totalSemDesconto.toFixed(2).replace('.', ','));
-                $('.desconto').html(totais.desconto.toFixed(2).replace('.', ','));
-                $('.percentual-desconto').html(totais.descontoPercentual + '%');
-                $('.total-com-desconto').html(totais.totalComDesconto.toFixed(2).replace('.', ','));
-            }
-
-            function atualizarQuantidadeNoServidor(carrinhoId, novaQuantidade) {
-                $.ajax({
-                    type: 'POST',
-                    url: 'carrinho.php',
-                    data: {
-                        carrinho_id: carrinhoId,
-                        nova_quantidade: novaQuantidade,
-                        ajax_request: 'true'
-                    },
-                    success: function (data) {
-                        if (data && data.success) {
-                            var totais = calcularTotais();
-                            atualizarTotaisNaInterface(totais);
-                        } else {
-                            console.error('Erro ao atualizar quantidade:', data.message);
+            // Verifique se a requisição é AJAX e está passando os dados corretamente
+            if (isset($_POST['ajax_request']) && $_POST['ajax_request'] == 'true') {
+                if (isset($_POST['carrinho_id']) && isset($_POST['nova_quantidade'])) {
+                    $carrinho_id = $_POST['carrinho_id'];
+                    $nova_quantidade = $_POST['nova_quantidade'];
+                    // Atualizar a quantidade no banco de dados
+                    $sql_update_quantidade = "UPDATE carrinho SET quantidade = $nova_quantidade WHERE id = $carrinho_id";
+                    if ($mysqli->query($sql_update_quantidade)) {
+                        // Se a quantidade foi atualizada, calculamos os novos totais
+                        $sql_get_carrinho = "SELECT * FROM carrinho WHERE usuario_id = {$_SESSION['usuario_id']}";
+                        $result = $mysqli->query($sql_get_carrinho);
+                        $totalSemDesconto = 0;
+                        $quantidadeTotal = 0;
+                        while ($row = $result->fetch_assoc()) {
+                            $totalSemDesconto += $row['preco'] * $row['quantidade'];
+                            $quantidadeTotal += $row['quantidade'];
                         }
-                    },
-                    error: function (error) {
-                        console.error('Erro ao atualizar quantidade:', error);
+                        // Cálculo de descontos com base na quantidade total
+                        $descontoPercentual = 0;
+                        if ($quantidadeTotal >= 3 && $quantidadeTotal < 6) {
+                            $descontoPercentual = 5;
+                        } elseif ($quantidadeTotal >= 6 && $quantidadeTotal < 9) {
+                            $descontoPercentual = 10;
+                        } elseif ($quantidadeTotal >= 9) {
+                            $descontoPercentual = 25;
+                        }
+                        $desconto = $totalSemDesconto * ($descontoPercentual / 100);
+                        $totalComDesconto = $totalSemDesconto - $desconto;
+                        // Retornar os totais em formato JSON
+                        echo json_encode([
+                            'totalSemDesconto' => number_format($totalSemDesconto, 2, ',', '.'),
+                            'desconto' => number_format($desconto, 2, ',', '.'),
+                            'percentualDesconto' => $descontoPercentual,
+                            'totalComDesconto' => number_format($totalComDesconto, 2, ',', '.'),
+                        ]);
+                    } else {
+                        echo json_encode(['error' => 'Erro ao atualizar quantidade']);
                     }
-                });
+                }
+                exit;
             }
 
-            $('.diminuir, .aumentar').on('click', function () {
-                var carrinhoId = $(this).data('carrinho-id');
-                var spanQuantidade = $(this).siblings('.quantidade');
-                var novaQuantidade;
-
-                if ($(this).hasClass('diminuir')) {
-                    novaQuantidade = Math.max(1, parseInt(spanQuantidade.text(), 10) - 1);
-                } else {
-                    novaQuantidade = parseInt(spanQuantidade.text(), 10) + 1;
+            ?>
+    </div>
+<?php else: ?>
+    <div class="animation">
+        <div class="p">
+            <img src="https://i.pinimg.com/originals/90/9c/b8/909cb8f105fc533e86901a2f0dcf5d7d.gif" Align="center"
+                class="Img-cart" alt="fotinha">
+            <p style="color: orangered;">Vazio</p>
+        </div>
+    </div>
+<?php endif; ?>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // Função para calcular os totais com base nas quantidades (localmente no frontend)
+        function calcularTotais() {
+            var totalSemDesconto = 0;
+            var quantidadeTotal = 0;
+            $('.carrinho-item').each(function() {
+                var preco = parseFloat($(this).find('.preco').data('preco')); // Pegando o preço atual do item
+                var quantidade = parseInt($(this).find('.quantidade').val(), 10); // Pegando a quantidade
+                totalSemDesconto += preco * quantidade; // Calculando o total sem desconto
+                quantidadeTotal += quantidade; // Somando a quantidade total de itens
+            });
+            // Cálculo do desconto com base na quantidade total de itens
+            var descontoPercentual = 0;
+            if (quantidadeTotal >= 3 && quantidadeTotal < 6) {
+                descontoPercentual = 5;
+            } else if (quantidadeTotal >= 6 && quantidadeTotal < 9) {
+                descontoPercentual = 10;
+            } else if (quantidadeTotal >= 9) {
+                descontoPercentual = 25;
+            }
+            var desconto = totalSemDesconto * (descontoPercentual / 100); // Calculando o valor do desconto
+            var totalComDesconto = totalSemDesconto - desconto; // Calculando o total com desconto
+            return {
+                totalSemDesconto: totalSemDesconto,
+                quantidadeTotal: quantidadeTotal,
+                descontoPercentual: descontoPercentual,
+                desconto: desconto,
+                totalComDesconto: totalComDesconto
+            };
+        }
+        // Atualiza os totais na interface do carrinho
+        function atualizarTotaisNaInterface(totais) {
+            $('.total-sem-desconto').html('R$ ' + totais.totalSemDesconto.toFixed(2).replace('.', ','));
+            $('.desconto').html('R$ ' + totais.desconto.toFixed(2).replace('.', ','));
+            $('.percentual-desconto').html(totais.descontoPercentual + '%');
+            $('.total-com-desconto').html('R$ ' + totais.totalComDesconto.toFixed(2).replace('.', ','));
+        }
+        // Função que envia os dados para o servidor para atualizar a quantidade no banco de dados
+        function atualizarQuantidadeNoServidor(carrinhoId, novaQuantidade) {
+            $.ajax({
+                type: 'POST',
+                url: 'carrinho.php', // A URL que processa o pedido AJAX
+                data: {
+                    carrinho_id: carrinhoId,
+                    nova_quantidade: novaQuantidade,
+                    ajax_request: 'true' // Indica que a requisição é AJAX
+                },
+                success: function(response) {
+                    var data = JSON.parse(response); // Espera-se que a resposta seja em formato JSON
+                    if (data.success) {
+                        var totais = calcularTotais();
+                        atualizarTotaisNaInterface(totais); // Atualiza os totais na interface
+                    } else {
+                        console.error('Erro ao atualizar quantidade:', response);
+                    }
+                },
+                error: function(error) {
+                    console.error('Erro ao atualizar quantidade:', error);
                 }
-
-                spanQuantidade.text(novaQuantidade);
-                atualizarQuantidadeNoServidor(carrinhoId, novaQuantidade);
             });
-
-            // Adicionar ouvinte de eventos input ao campo de quantidade
-            $('.quantidade').on('input', function () {
-                var carrinhoId = $(this).data('carrinho-id');
-                var novaQuantidade = Math.max(1, parseInt($(this).text(), 10)) || 1;
-                atualizarQuantidadeNoServidor(carrinhoId, novaQuantidade);
-
-                // Calcular e atualizar os totais imediatamente
-                var totais = calcularTotais();
-                atualizarTotaisNaInterface(totais);
-            });
-
-            $('.quantidade').on('blur', function () {
-                var carrinhoId = $(this).data('carrinho-id');
-                var novaQuantidade = Math.max(1, parseInt($(this).text(), 10)) || 1;
-                atualizarQuantidadeNoServidor(carrinhoId, novaQuantidade);
-            });
-
-            // Chamar calcularTotais() inicialmente para exibir os totais iniciais
-            var initialTotais = calcularTotais();
-            atualizarTotaisNaInterface(initialTotais);
+        }
+        // Lida com os cliques no botão de aumentar ou diminuir a quantidade
+        $('.diminuir, .aumentar').on('click', function() {
+            var carrinhoId = $(this).data('carrinho-id');
+            var inputQuantidade = $(this).siblings('.quantidade');
+            var novaQuantidade;
+            if ($(this).hasClass('diminuir')) {
+                novaQuantidade = Math.max(1, parseInt(inputQuantidade.val(), 10) - 1); // Usando .val() ao invés de .text()
+            } else {
+                novaQuantidade = parseInt(inputQuantidade.val(), 10) + 1;
+            }
+            inputQuantidade.val(novaQuantidade); // Atualiza o valor no input
+            atualizarQuantidadeNoServidor(carrinhoId, novaQuantidade); // Envia a nova quantidade para o servidor
         });
-    </script>
+        // Atualiza a quantidade diretamente quando o valor do input mudar
+        $('.quantidade').on('input', function() {
+            var carrinhoId = $(this).data('carrinho-id');
+            var novaQuantidade = Math.max(1, parseInt($(this).val(), 10)); // Usando .val() ao invés de .text()
+            // Recalcula o valor do item e atualiza o valor do preço na interface
+            var precoItem = parseFloat($(this).siblings('.preco').data('preco'));
+            var novoPreco = precoItem * novaQuantidade;
+            $(this).siblings('.preco').html('R$ ' + novoPreco.toFixed(2).replace('.', ','));
+            // Envia a nova quantidade para o servidor
+            atualizarQuantidadeNoServidor(carrinhoId, novaQuantidade);
+            // Recalcula e atualiza os totais
+            var totais = calcularTotais();
+            atualizarTotaisNaInterface(totais);
+        });
+        // Chama calcularTotais() inicialmente para exibir os totais
+        var initialTotais = calcularTotais();
+        atualizarTotaisNaInterface(initialTotais);
+    });
+</script>
+
+<div class="carrinho-function">
     <p class="pp" style="text-align:center; font-size: 20px;">
         <span style="color: orangered; font-size: 20px;">Total</span><br>
         <s>
@@ -629,8 +553,5 @@ $mysqli->close();
             0,00
         </span>
     </p>
-
-
-</body>
-
-</html>
+</div>
+</div>

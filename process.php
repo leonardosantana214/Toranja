@@ -7,6 +7,12 @@ error_reporting(E_ALL);
 
 include_once('conexao.php');
 
+// Verificar se o usuário está logado
+if (!isset($_SESSION['email'])) {
+    header("Location: LoginToranjão.php");
+    exit();
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Operações de Login
     if (isset($_POST['email']) && isset($_POST['senha'])) {
@@ -19,13 +25,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         if ($quantidade == 1) {
             $usuario = $sql_query->fetch_assoc();
-        
+
             if (password_verify($senha, $usuario['senha'])) {
                 // Iniciar a sessão e armazenar informações relevantes
                 $_SESSION['email'] = $usuario['email'];
                 $_SESSION['nome'] = $usuario['nome'];
                 $_SESSION['image'] = $usuario['image'];
-        
+                $_SESSION['usuario_id'] = $usuario['id']; // Presumindo que 'id' é a chave primária do usuário
+
                 // Redirecionar para a página home
                 header("location: meu primeiro site.php");
                 exit();
@@ -41,16 +48,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             header('Location: LoginToranjão.php');
             exit();
         }
-        
     }
 }
 
 $type = filter_input(INPUT_POST, "type");
 
 if ($type == "logout") {
+    // Limpar as variáveis de sessão
     $_SESSION['email'] = "";
     $_SESSION['nome'] = "";
+    $_SESSION['image'] = "";
     $_SESSION['usuario_id'] = "";
+
     // Redirecionar para a página inicial
     header("location: meu primeiro site.php");
     exit();

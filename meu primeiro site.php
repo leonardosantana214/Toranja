@@ -16,13 +16,7 @@ if (!isset($_SESSION['email'])) {
 	header("location: process.php");
 	exit();
 }
-
 $username_toshow = $_SESSION['nome'];
-
-
-
-
-
 ?>
 
 <!DOCTYPE html>
@@ -62,6 +56,43 @@ $username_toshow = $_SESSION['nome'];
 		body.fade-out {
 			opacity: 0;
 			transition: 1s;
+		}
+
+		/* CARRINHO SISTEMA DE JANELA ABERTA E FECHADA */
+		#carrinho-janela {
+			position: fixed;
+			top: 0;
+			right: -100%;
+			/* Inicialmente fora da tela */
+			width: 35%;
+			height: 100vh;
+			background-color: black !important;
+			box-shadow: -4px 0 10px rgba(0, 0, 0, 0.2);
+			transition: right 0.3s ease-in-out;
+			z-index: 1000;
+		}
+
+		.carrinho-aberto {
+			right: 0 !important;
+		}
+
+		#carrinho-conteudo {
+			padding: 20px;
+			height: 100%;
+			overflow-y: auto;
+		}
+
+		.btn-cart {
+			display: flex;
+			justify-content: space-between;
+			margin-top: 20px;
+		}
+
+		@media (max-width: 768px) {
+			#carrinho-janela {
+				width: 80%;
+				/* Ajusta a largura para telas menores */
+			}
 		}
 
 		* {
@@ -370,7 +401,7 @@ $username_toshow = $_SESSION['nome'];
 			background-color: #fff;
 			overflow-y: auto;
 			transition: right 0.5s ease-in-out;
-			z-index: 9999;
+			z-index: 6;
 		}
 
 		#carrinho-janela.carrinho-aberto {
@@ -380,6 +411,7 @@ $username_toshow = $_SESSION['nome'];
 
 		#carrinho-conteudo {
 			padding: 20px;
+			overflow-y: none;
 
 		}
 
@@ -485,6 +517,13 @@ $username_toshow = $_SESSION['nome'];
 		.invisivel {
 			opacity: 0;
 			transition: all 1s;
+		}
+
+		.function-button {
+			display: flex;
+			justify-content: space-evenly;
+			align-items: center;
+			text-align: center;
 		}
 	</style>
 </head>
@@ -644,48 +683,36 @@ $username_toshow = $_SESSION['nome'];
 
 								</form>
 							</div>
-							<?php if ($_SESSION['email'] == 'Toranjas@toto.com') : ?>
-								<button id="Add-btn" class="btn-Link" style="left: 205px; position: absolute; width:6%; height:4%; justify-content:center; text-align:center; display:flex; justify-content:center; align-items:center; bottom:111px; color:orangered;">Add</button>
-
-								<div id="myModal" class="modal">
-									<div class="modal-content">
-										<span id="closeModal" class="close">&times;</span>
-										<?php include_once('adicionar-produtos.php') ?>
+							<div class="function-button">
+								<?php if ($_SESSION['email'] == 'Toranjas@toto.com') : ?>
+									<button id="Add-btn" class="btn-Link" style=" justify-content:center; text-align:center; display:flex; justify-content:center; align-items:center; color:orangered;">Add</button>
+									<div id="myModal" class="modal">
+										<div class="modal-content">
+											<span id="closeModal" class="close">&times;</span>
+											<?php include_once('adicionar-produtos.php') ?>
+										</div>
 									</div>
-								</div>
-								<hr>
-							<?php endif; ?>
-
-							<a href="editprofile.php" class="btn-Link fade-link">Editar Perfil</a>
-
-							<button type="buttom" id="abrir-carrinho" class="btn-Link" style="margin-left:10px; color:orangered; width:45px; height:40px;">
-								<i class="fa-solid fa-cart-shopping"></i>
-							</button>
-
-							<div id="carrinho-janela" style="background-color:transparent;">
+									<hr>
+								<?php endif; ?>
+								<a href="editprofile.php" class="btn-Link fade-link">Editar Perfil</a>
+								<button type="button" id="abrir-carrinho" class="btn-Link" style="margin-left:10px; color:orangered;">
+									<i class="fa-solid fa-cart-shopping"></i>
+								</button>
+								<form action="process.php" method="POST" style="margin-left: 20px;">
+									<input type="hidden" value="logout" name="type">
+									<button type="submit" class="btn-Link" style=" color:red;">Logout</button>
+								</form>
+							</div>
+							<div id="carrinho-janela" style="color: transparent;">
 								<div id="carrinho-conteudo">
-									<!-- Conteúdo da janela -->
-									<?php
-									include('carrinho.php');
-
-									?>
-
+									<?php include('carrinho.php'); ?>
 									<hr>
 									<div class="btn-cart">
-										<button id="fechar-carrinho" class="btn-Link" style="color:red; position:relative; right:10px;
-				background-color: orange;">Fechar</button>
-										<button class="btn-Link" style="color:Green; position:relative; right:10px; margin-left:10px;
-				background-color: orange;">Comprar</button>
+										<button id="fechar-carrinho" class="btn-Link" style="color:red; background-color: orange; margin: 10px;">Fechar</button>
+										<button class="btn-Link" style="color:green; background-color: orange;">Comprar</button>
 									</div>
-
-									<div id="loading" class="mini-loading"></div>
-
 								</div>
 							</div>
-							<form action="process.php" method="POST">
-								<input type="hidden" value="logout" name="type">
-								<button type="submit" class="btn-Link" style="width:150px; height:40px; color:red;">Logout</button>
-							</form>
 
 						<?php else : ?>
 							<div class="login-options">
@@ -827,7 +854,7 @@ $username_toshow = $_SESSION['nome'];
 
 			setTimeout(function() {
 				window.location = newLocation;
-			}, 1000); 
+			}, 1000);
 		});
 	});
 </script>
@@ -878,61 +905,31 @@ $username_toshow = $_SESSION['nome'];
 	});
 
 
-	document.addEventListener('DOMContentLoaded', (event) => {
+	document.addEventListener('DOMContentLoaded', () => {
 		const carrinhoJanela = document.getElementById('carrinho-janela');
 		const abrirCarrinhoBtn = document.getElementById('abrir-carrinho');
-		const loading = document.getElementById('loading');
-		let carregamentoRealizado = false;
+		const fecharCarrinhoBtn = document.getElementById('fechar-carrinho');
 
-		// Evento para abrir o carrinho
 		abrirCarrinhoBtn.addEventListener('click', (event) => {
 			event.preventDefault();
-
-			// Se o carregamento não foi realizado, inicia o carregamento
-			if (!carregamentoRealizado) {
-				// Exibe o loading
-				loading.style.display = 'block';
-
-				// Simula um tempo de carregamento (substitua por seu código de carregamento real)
-				setTimeout(() => {
-					carregamentoRealizado = true; // Atualiza a variável para indicar que o carregamento foi realizado
-					carrinhoJanela.style.right = '0';
-					carrinhoJanela.classList.add('carrinho-aberto');
-					loading.style.display = 'none'; // Esconde o loading após o carregamento
-				}, 1000); // Ajuste o tempo conforme necessário
-			} else {
-				// Se o carregamento já foi realizado, abre o carrinho imediatamente
-				carrinhoJanela.style.right = '0';
-				carrinhoJanela.classList.add('carrinho-aberto');
-			}
+			carrinhoJanela.classList.add('carrinho-aberto');
 		});
 
-		const carrinhoConteudo = document.getElementById('carrinho-conteudo');
-
-		carrinhoConteudo.addEventListener('click', (event) => {
-			// Impede a propagação do evento para evitar que atinja o manipulador de fechamento da janela
-			event.stopPropagation();
+		fecharCarrinhoBtn.addEventListener('click', (event) => {
+			event.preventDefault();
+			carrinhoJanela.classList.remove('carrinho-aberto');
 		});
 
-		// Evento para fechar o carrinho ao clicar fora dele
 		document.addEventListener('click', (event) => {
-			if (event.target !== carrinhoJanela && event.target !== abrirCarrinhoBtn) {
-				carrinhoJanela.style.right = '-35%';
+			if (!carrinhoJanela.contains(event.target) && event.target !== abrirCarrinhoBtn) {
 				carrinhoJanela.classList.remove('carrinho-aberto');
 			}
 		});
 
-		const fecharCarrinhoBtn = document.getElementById('fechar-carrinho');
-
-		fecharCarrinhoBtn.addEventListener('click', (event) => {
-			event.preventDefault(); // Evita qualquer comportamento padrão do botão
-			carrinhoJanela.style.right = '-35%';
-			carrinhoJanela.classList.remove('carrinho-aberto');
+		document.getElementById('carrinho-conteudo').addEventListener('click', (event) => {
+			event.stopPropagation(); // Impede que o clique dentro do carrinho feche a janela
 		});
-
 	});
 </script>
-
-
 
 </html>

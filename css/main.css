@@ -576,8 +576,8 @@ a.next:hover {
 .btn-Link {
 	font-family: 'Pixeboy-z8XGD';
 	font-size: large;
-	width: 150px;
-	height: 50px;
+	width: auto;
+	height: auto;
 	color: white;
 	text-transform: uppercase;
 	background-color: rgba(255, 166, 0, 0.182);
@@ -590,6 +590,7 @@ a.next:hover {
 	transition: 1s;
 	box-shadow: -3px 0 0 0 black, 3px 0 0 0 black, 0 -3px 0 0 black, 0 3px 0 0 black;
 	margin-top: 30px;
+	text-align: center;
 }
 
 .btn-Link:active {
