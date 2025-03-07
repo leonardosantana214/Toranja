@@ -382,7 +382,7 @@ form {
 
 .btn-6 span:hover:before {
   transition: 1s;
-  width: 100%;
+  width: auto;
 }
 
 .btn-6 span:hover:after {

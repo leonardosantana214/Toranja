@@ -85,7 +85,11 @@ function calcularTotalComDesconto($total, $desconto)
 {
     return $total - $desconto;
 }
-
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['excluir_produto'])) {
+    excluirProdutoDoCarrinho($mysqli, $_GET['excluir_produto']);
+    header("Location: Meu Primeiro Site.php");
+    exit();
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['adicionar_carrinho'])) {
         if (!isset($_SESSION['usuario_id'])) {
@@ -351,7 +355,7 @@ $mysqli->close();
             }
         }
 
-        .carrinho-all-tools{
+        .carrinho-all-tools {
             overflow-y: none;
         }
     </style>
@@ -378,7 +382,8 @@ $mysqli->close();
                     <p class="preco" data-preco="<?= $row['preco'] ?>">R$ <?= $row['preco'] ?></p>
                     <div class="quantidade-controls">
                         <input type="number" class="quantidade" max="10" data-carrinho-id="<?= $row['id'] ?>" value="<?= $row['quantidade'] ?>" min="1">
-                        <a href="carrinho.php?excluir_produto=<?= $row['id'] ?>" class="excluir-produto">Excluir</a>
+                        <a href="#" class="excluir-produto" data-carrinho-id="<?= $row['id'] ?>">Excluir</a>
+
                     </div>
                 </div>
 
@@ -532,6 +537,22 @@ $mysqli->close();
         // Chama calcularTotais() inicialmente para exibir os totais
         var initialTotais = calcularTotais();
         atualizarTotaisNaInterface(initialTotais);
+    });
+    $(document).on('click', '.excluir-produto', function(e) {
+        e.preventDefault();
+        let carrinhoId = $(this).data('carrinho-id');
+
+        $.post('carrinho.php', {
+            excluir_produto: true,
+            carrinho_id: carrinhoId,
+            ajax_request: 'true'
+        }, function(response) {
+            if (response.trim() === 'Produto removido!') {
+                location.reload(); // Atualiza a página após excluir
+            } else {
+                alert('Erro ao remover o produto.');
+            }
+        });
     });
 </script>
 
