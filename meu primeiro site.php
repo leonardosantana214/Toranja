@@ -521,7 +521,7 @@ $username_toshow = $_SESSION['nome'];
 
 		.function-button {
 			display: flex;
-			justify-content: space-evenly;
+			justify-content: space-between;
 			align-items: center;
 			text-align: center;
 		}
@@ -684,6 +684,7 @@ $username_toshow = $_SESSION['nome'];
 								</form>
 							</div>
 							<div class="function-button">
+								<a href="editprofile.php" style="height: 18px; margin-right: 10px; text-align: center;  justify-content:center; text-align:center; display:flex; justify-content:center; align-items:center; " class="btn-Link fade-link">Perfil</a>
 								<?php if ($_SESSION['email'] == 'Toranjas@toto.com') : ?>
 									<button id="Add-btn" class="btn-Link" style=" justify-content:center; text-align:center; display:flex; justify-content:center; align-items:center; color:orangered;">Add</button>
 									<div id="myModal" class="modal">
@@ -694,7 +695,7 @@ $username_toshow = $_SESSION['nome'];
 									</div>
 									<hr>
 								<?php endif; ?>
-								<a href="editprofile.php" class="btn-Link fade-link">Editar Perfil</a>
+
 								<button type="button" id="abrir-carrinho" class="btn-Link" style="margin-left:10px; color:orangered;">
 									<i class="fa-solid fa-cart-shopping"></i>
 								</button>

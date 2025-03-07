@@ -23,9 +23,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['email'] = $usuario['email'];
                 $_SESSION['nome'] = $usuario['nome'];
                 $_SESSION['image'] = $usuario['image'];
-
+                $_SESSION['usuario_id'] = $usuario['id']; // Presumindo que 'id' é a chave primária do usuário
                 // Redirecionar para a página home
-                header("location: meu_primeiro_site.php");
+                header("location: meu primeiro site.php");
                 exit();
             } else {
                 // Defina a mensagem de erro para senha incorreta

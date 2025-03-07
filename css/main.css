@@ -576,7 +576,7 @@ a.next:hover {
 .btn-Link {
 	font-family: 'Pixeboy-z8XGD';
 	font-size: large;
-	width: auto;
+	width: 150px;
 	height: auto;
 	color: white;
 	text-transform: uppercase;
